@@ -1,6 +1,14 @@
 import React, { useState } from "react";
 import { FaChevronDown, FaChevronRight, FaPlus, FaMinus } from "react-icons/fa";
 
+const nameCriterios = [
+    "Correct pronunciation",
+    "Correct spelling",
+    "Correct use of fluency",
+    "Confidence and poise",
+    "Proper start and ending",
+];
+
 const inicializarDatos = () => [
     {
         nombre: "4 años",
@@ -8,15 +16,17 @@ const inicializarDatos = () => [
             {
                 nombre: "Ronda 1",
                 alumnos: [
-                    { alumno: "Juan Pérez", palabra: "Apple", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "María López", palabra: "Orange", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Juan", palabra: "Dog", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Ana", palabra: "Cat", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Luis", palabra: "Car", criterios: [5, 5, 5, 5, 5] },
                 ],
             },
             {
                 nombre: "Ronda 2",
                 alumnos: [
-                    { alumno: "Juan Pérez", palabra: "Banana", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "María López", palabra: "Grapes", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Juan", palabra: "Tree", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Ana", palabra: "Sky", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Luis", palabra: "Sun", criterios: [5, 5, 5, 5, 5] },
                 ],
             },
         ],
@@ -27,8 +37,22 @@ const inicializarDatos = () => [
             {
                 nombre: "Ronda 1",
                 alumnos: [
-                    { alumno: "Pedro Díaz", palabra: "Table", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Lucía Gómez", palabra: "Chair", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "María", palabra: "Book", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Pedro", palabra: "Pen", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Sofía", palabra: "Desk", criterios: [5, 5, 5, 5, 5] },
+                ],
+            },
+        ],
+    },
+    {
+        nombre: "1° de Primaria",
+        rondas: [
+            {
+                nombre: "Ronda 1",
+                alumnos: [
+                    { alumno: "Andrés", palabra: "Chair", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Lucía", palabra: "Table", criterios: [5, 5, 5, 5, 5] },
+                    { alumno: "Carlos", palabra: "Door", criterios: [5, 5, 5, 5, 5] },
                 ],
             },
         ],
@@ -43,135 +67,156 @@ export const PageJurado = () => {
     const sumaCriterios = (criterios) => criterios.reduce((a, b) => a + b, 0);
 
     const cambiarCriterio = (gIndex, rIndex, aIndex, cIndex, delta) => {
-        setGrupos((prev) => {
-            const nuevos = [...prev];
-            const valorActual = nuevos[gIndex].rondas[rIndex].alumnos[aIndex].criterios[cIndex];
-            const nuevoValor = Math.min(5, Math.max(0, valorActual + delta));
-            nuevos[gIndex].rondas[rIndex].alumnos[aIndex].criterios[cIndex] = nuevoValor;
-            return nuevos;
-        });
+        setGrupos((prev) =>
+            prev.map((grupo, gi) => {
+                if (gi !== gIndex) return grupo;
+                return {
+                    ...grupo,
+                    rondas: grupo.rondas.map((ronda, ri) => {
+                        if (ri !== rIndex) return ronda;
+                        return {
+                            ...ronda,
+                            alumnos: ronda.alumnos.map((alumno, ai) => {
+                                if (ai !== aIndex) return alumno;
+                                const nuevosCriterios = alumno.criterios.map((valor, ci) =>
+                                    ci === cIndex
+                                        ? Math.min(5, Math.max(0, valor + delta))
+                                        : valor
+                                );
+                                return { ...alumno, criterios: nuevosCriterios };
+                            }),
+                        };
+                    }),
+                };
+            })
+        );
     };
 
     const calcularPuestos = (alumnos) => {
-        const conTotales = alumnos.map((a) => ({
+        const conTotales = alumnos.map((a, idx) => ({
             ...a,
             total: sumaCriterios(a.criterios),
+            originalIndex: idx
         }));
-        conTotales.sort((a, b) => b.total - a.total);
-        return conTotales.map((a, index) => ({
-            ...a,
-            puesto: index + 1,
-        }));
+
+        const ordenados = [...conTotales].sort((a, b) => b.total - a.total)
+
+        let puestoActual = 0;
+        let ultimoTotal = null;
+
+        ordenados.forEach((a) => {
+            if (a.total !== ultimoTotal) {
+                puestoActual++;
+                ultimoTotal = a.total;
+            }
+            conTotales[a.originalIndex].puesto = puestoActual;
+        });
+
+        return conTotales
     };
 
-    const toggleGroup = (gIndex) => {
-        setExpandedGroups((prev) => ({
-            ...prev,
-            [gIndex]: !prev[gIndex],
-        }));
-    };
+    const toggleGroup = (gIndex) =>
+        setExpandedGroups((prev) => ({ ...prev, [gIndex]: !prev[gIndex] }));
 
     const toggleRound = (gIndex, rIndex) => {
         const key = `${gIndex}-${rIndex}`;
-        setExpandedRounds((prev) => ({
-            ...prev,
-            [key]: !prev[key],
-        }));
-    };
-
-    const getBorderColor = (puesto) => {
-        if (puesto === 1) return "border-yellow-500 shadow-yellow-300 shadow-lg";
-        if (puesto === 2) return "border-gray-400 shadow-gray-300 shadow-lg";
-        if (puesto === 3) return "border-amber-700 shadow-amber-300 shadow-lg";
-        return "border-gray-200";
+        setExpandedRounds((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
     return (
-        <div className="p-6 max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">Competencias</h1>
+        <div className="p-4">
             {grupos.map((grupo, gIndex) => (
-                <div key={gIndex} className="mb-4 border rounded-lg shadow bg-white">
-                    {/* Header Grupo */}
+                <div key={gIndex} className="mb-4 border rounded">
                     <div
+                        className="flex items-center cursor-pointer bg-blue-100 p-2"
                         onClick={() => toggleGroup(gIndex)}
-                        className="flex items-center justify-between p-4 bg-blue-200 cursor-pointer hover:bg-blue-300"
                     >
-                        <span className="font-semibold text-lg">{grupo.nombre}</span>
                         {expandedGroups[gIndex] ? <FaChevronDown /> : <FaChevronRight />}
+                        <h2 className="ml-2 font-bold">{grupo.nombre}</h2>
                     </div>
-
-                    {/* Rondas */}
                     {expandedGroups[gIndex] &&
                         grupo.rondas.map((ronda, rIndex) => {
                             const alumnosConPuesto = calcularPuestos(ronda.alumnos);
-
+                            const key = `${gIndex}-${rIndex}`;
                             return (
-                                <div key={rIndex} className="border-t">
+                                <div key={rIndex} className="ml-4 border rounded mt-2">
                                     <div
+                                        className="flex items-center cursor-pointer bg-green-100 p-2"
                                         onClick={() => toggleRound(gIndex, rIndex)}
-                                        className="flex items-center justify-between p-3 bg-gray-100 cursor-pointer hover:bg-gray-200"
                                     >
-                                        <span>{ronda.nombre}</span>
-                                        {expandedRounds[`${gIndex}-${rIndex}`] ? (
-                                            <FaChevronDown />
-                                        ) : (
-                                            <FaChevronRight />
-                                        )}
+                                        {expandedRounds[key] ? <FaChevronDown /> : <FaChevronRight />}
+                                        <h3 className="ml-2 font-semibold">{ronda.nombre}</h3>
                                     </div>
-
-                                    {expandedRounds[`${gIndex}-${rIndex}`] && (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                                            {alumnosConPuesto.map((al, aIndex) => (
-                                                <div
-                                                    key={aIndex}
-                                                    className={`p-4 border-2 rounded-lg bg-white flex flex-col gap-2 ${getBorderColor(
-                                                        al.puesto
-                                                    )}`}
-                                                >
-                                                    <div className="flex justify-between">
-                                                        <h2 className="font-bold">{al.alumno}</h2>
-                                                        <span className="text-sm bg-gray-200 px-2 rounded">
-                                                            Puesto {al.puesto}
-                                                        </span>
-                                                    </div>
-                                                    <p className="italic text-gray-600">Palabra: {al.palabra}</p>
-
-                                                    {/* Criterios */}
-                                                    {al.criterios.map((c, cIndex) => (
-                                                        <div key={cIndex} className="flex items-center gap-2">
-                                                            <span className="text-sm w-20">Criterio {cIndex + 1}</span>
-                                                            <button
-                                                                onClick={() =>
-                                                                    cambiarCriterio(gIndex, rIndex, aIndex, cIndex, -1)
-                                                                }
-                                                                className="p-1 bg-red-200 rounded hover:bg-red-300"
-                                                            >
-                                                                <FaMinus />
-                                                            </button>
-                                                            <span>{c}</span>
-                                                            <button
-                                                                onClick={() =>
-                                                                    cambiarCriterio(gIndex, rIndex, aIndex, cIndex, 1)
-                                                                }
-                                                                className="p-1 bg-green-200 rounded hover:bg-green-300"
-                                                            >
-                                                                <FaPlus />
-                                                            </button>
-                                                            <div className="flex-1 bg-gray-200 rounded h-2">
-                                                                <div
-                                                                    className="bg-green-500 h-2 rounded"
-                                                                    style={{ width: `${(c / 5) * 100}%` }}
-                                                                ></div>
-                                                            </div>
-                                                        </div>
+                                    {expandedRounds[key] && (
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full border mt-2">
+                                                <thead className="bg-gray-200">
+                                                    <tr>
+                                                        <th className="border p-2">Alumno</th>
+                                                        <th className="border p-2">Palabra</th>
+                                                        {nameCriterios.map((c, idx) => (
+                                                            <th key={idx} className="border p-2">
+                                                                {c}
+                                                            </th>
+                                                        ))}
+                                                        <th className="border p-2">Total</th>
+                                                        <th className="border p-2">Puesto</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {alumnosConPuesto.map((al) => (
+                                                        <tr key={al.originalIndex} className="text-center">
+                                                            <td className="border p-2 font-bold">{al.alumno}</td>
+                                                            <td className="border p-2 italic">{al.palabra}</td>
+                                                            {al.criterios.map((c, cIndex) => (
+                                                                <td key={cIndex} className="border p-2">
+                                                                    <div className="flex items-center justify-center gap-2">
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                cambiarCriterio(
+                                                                                    gIndex,
+                                                                                    rIndex,
+                                                                                    al.originalIndex,
+                                                                                    cIndex,
+                                                                                    -1
+                                                                                )
+                                                                            }
+                                                                            disabled={c === 0}
+                                                                            className="p-1 bg-red-200 rounded disabled:opacity-50"
+                                                                        >
+                                                                            <FaMinus />
+                                                                        </button>
+                                                                        <span>{c}</span>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                cambiarCriterio(
+                                                                                    gIndex,
+                                                                                    rIndex,
+                                                                                    al.originalIndex,
+                                                                                    cIndex,
+                                                                                    1
+                                                                                )
+                                                                            }
+                                                                            disabled={c === 5}
+                                                                            className="p-1 bg-green-200 rounded disabled:opacity-50"
+                                                                        >
+                                                                            <FaPlus />
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="w-full h-2 bg-gray-200 rounded mt-1">
+                                                                        <div
+                                                                            className="h-full bg-blue-400 rounded"
+                                                                            style={{ width: `${(c / 5) * 100}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                            <td className="border p-2 font-bold">{al.total}</td>
+                                                            <td className="border p-2">#{al.puesto}</td>
+                                                        </tr>
                                                     ))}
-
-                                                    {/* Total */}
-                                                    <div className="mt-2 text-right font-bold">
-                                                        Total: {al.total}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     )}
                                 </div>
