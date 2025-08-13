@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { getRound } from '../../../api/RoundAPI'
 import { FaChevronDown, FaChevronRight, FaPlus, FaMinus } from "react-icons/fa";
 
 const nameCriterios = [
@@ -9,60 +10,44 @@ const nameCriterios = [
     "Proper start and ending",
 ];
 
-const inicializarDatos = () => [
-    {
-        nombre: "4 años",
-        rondas: [
-            {
-                nombre: "Ronda 1",
-                alumnos: [
-                    { alumno: "Juan", palabra: "Dog", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Ana", palabra: "Cat", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Luis", palabra: "Car", criterios: [5, 5, 5, 5, 5] },
-                ],
-            },
-            {
-                nombre: "Ronda 2",
-                alumnos: [
-                    { alumno: "Juan", palabra: "Tree", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Ana", palabra: "Sky", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Luis", palabra: "Sun", criterios: [5, 5, 5, 5, 5] },
-                ],
-            },
-        ],
-    },
-    {
-        nombre: "5 años",
-        rondas: [
-            {
-                nombre: "Ronda 1",
-                alumnos: [
-                    { alumno: "María", palabra: "Book", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Pedro", palabra: "Pen", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Sofía", palabra: "Desk", criterios: [5, 5, 5, 5, 5] },
-                ],
-            },
-        ],
-    },
-    {
-        nombre: "1° de Primaria",
-        rondas: [
-            {
-                nombre: "Ronda 1",
-                alumnos: [
-                    { alumno: "Andrés", palabra: "Chair", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Lucía", palabra: "Table", criterios: [5, 5, 5, 5, 5] },
-                    { alumno: "Carlos", palabra: "Door", criterios: [5, 5, 5, 5, 5] },
-                ],
-            },
-        ],
-    },
-];
-
 export const PageJurado = () => {
-    const [grupos, setGrupos] = useState(inicializarDatos());
+    const [grupos, setGrupos] = useState([]);
     const [expandedGroups, setExpandedGroups] = useState({});
     const [expandedRounds, setExpandedRounds] = useState({});
+
+
+    useEffect(() => {
+        getRound()
+            .then((res) => {
+                const data = res.data;
+
+                // Transformar datos para que coincidan con la estructura de "grupos"
+                const grupo = {
+                    nombre: "Ronda de estudiantes", // Nombre del grupo
+                    rondas: [
+                        {
+                            nombre: "Ronda 1",
+                            alumnos: data.map((item) => ({
+                                alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
+                                palabra: item.word.trim(),
+                                criterios: [
+                                    item.criterionOne,
+                                    item.criterionTwo,
+                                    item.criterionThree,
+                                    item.criterionFour,
+                                    item.criterionFive
+                                ]
+                            }))
+                        }
+                    ]
+                };
+
+                setGrupos([grupo]); // Solo un grupo en este caso
+            })
+            .catch((err) => {
+                console.error("Error al obtener datos:", err);
+            });
+    }, []);
 
     const sumaCriterios = (criterios) => criterios.reduce((a, b) => a + b, 0);
 
@@ -99,7 +84,7 @@ export const PageJurado = () => {
             originalIndex: idx
         }));
 
-        const ordenados = [...conTotales].sort((a, b) => b.total - a.total)
+        const ordenados = [...conTotales].sort((a, b) => b.total - a.total);
 
         let puestoActual = 0;
         let ultimoTotal = null;
@@ -112,7 +97,7 @@ export const PageJurado = () => {
             conTotales[a.originalIndex].puesto = puestoActual;
         });
 
-        return conTotales
+        return conTotales;
     };
 
     const toggleGroup = (gIndex) =>
@@ -159,7 +144,7 @@ export const PageJurado = () => {
                                                                 {c}
                                                             </th>
                                                         ))}
-                                                        <th className="border p-2">Total</th>
+                                                        <th className="border p-2">Puntaje Total</th>
                                                         <th className="border p-2">Puesto</th>
                                                     </tr>
                                                 </thead>
