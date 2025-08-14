@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { getRound } from '../../../api/RoundAPI'
-import { FaChevronDown, FaChevronRight, FaPlus, FaMinus } from "react-icons/fa";
+import { getGroups, getRoundsByGroupId, saveScore } from "../../../api/RoundAPI";
+import { FaChevronDown, FaChevronRight, FaPlus, FaMinus, FaCheck } from "react-icons/fa";
 
 const nameCriterios = [
     "Correct pronunciation",
@@ -13,79 +13,72 @@ const nameCriterios = [
 export const PageJurado = () => {
     const [grupos, setGrupos] = useState([]);
     const [expandedGroups, setExpandedGroups] = useState({});
-    const [expandedRounds, setExpandedRounds] = useState({});
-
+    const [roundsData, setRoundsData] = useState({});
+    const [loadingRounds, setLoadingRounds] = useState({});
+    const [saving, setSaving] = useState({});
 
     useEffect(() => {
-        getRound()
-            .then((res) => {
-                const data = res.data;
-
-                // Transformar datos para que coincidan con la estructura de "grupos"
-                const grupo = {
-                    nombre: "Ronda de estudiantes", // Nombre del grupo
-                    rondas: [
-                        {
-                            nombre: "Ronda 1",
-                            alumnos: data.map((item) => ({
-                                alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
-                                palabra: item.word.trim(),
-                                criterios: [
-                                    item.criterionOne,
-                                    item.criterionTwo,
-                                    item.criterionThree,
-                                    item.criterionFour,
-                                    item.criterionFive
-                                ]
-                            }))
-                        }
-                    ]
-                };
-
-                setGrupos([grupo]); // Solo un grupo en este caso
-            })
-            .catch((err) => {
-                console.error("Error al obtener datos:", err);
-            });
+        getGroups()
+            .then((res) => setGrupos(res.data))
+            .catch((err) => console.error("Error al obtener grupos:", err));
     }, []);
 
-    const sumaCriterios = (criterios) => criterios.reduce((a, b) => a + b, 0);
+    const toggleGroup = (idGrade) => {
+        setExpandedGroups((prev) => ({ ...prev, [idGrade]: !prev[idGrade] }));
 
-    const cambiarCriterio = (gIndex, rIndex, aIndex, cIndex, delta) => {
-        setGrupos((prev) =>
-            prev.map((grupo, gi) => {
-                if (gi !== gIndex) return grupo;
-                return {
-                    ...grupo,
-                    rondas: grupo.rondas.map((ronda, ri) => {
-                        if (ri !== rIndex) return ronda;
-                        return {
-                            ...ronda,
-                            alumnos: ronda.alumnos.map((alumno, ai) => {
-                                if (ai !== aIndex) return alumno;
-                                const nuevosCriterios = alumno.criterios.map((valor, ci) =>
-                                    ci === cIndex
-                                        ? Math.min(5, Math.max(0, valor + delta))
-                                        : valor
-                                );
-                                return { ...alumno, criterios: nuevosCriterios };
-                            }),
-                        };
-                    }),
-                };
-            })
-        );
+        if (!roundsData[idGrade]) {
+            setLoadingRounds((prev) => ({ ...prev, [idGrade]: true }));
+
+            getRoundsByGroupId(idGrade)
+                .then((res) => {
+                    const alumnosTransformados = res.data.map((item) => ({
+                        idStudentEventRound: item.idStudentEventRound,
+                        alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
+                        palabra: item.word.trim(),
+                        criterios: [
+                            item.criterionOne,
+                            item.criterionTwo,
+                            item.criterionThree,
+                            item.criterionFour,
+                            item.criterionFive,
+                        ],
+                    }));
+                    setRoundsData((prev) => ({ ...prev, [idGrade]: alumnosTransformados }));
+                })
+                .catch((err) => console.error("Error al obtener rondas:", err))
+                .finally(() =>
+                    setLoadingRounds((prev) => ({ ...prev, [idGrade]: false }))
+                );
+        }
     };
+
+    const cambiarCriterio = (idGrade, aIndex, cIndex, delta) => {
+        setRoundsData((prev) => ({
+            ...prev,
+            [idGrade]: prev[idGrade].map((alumno, ai) =>
+                ai === aIndex
+                    ? {
+                        ...alumno,
+                        criterios: alumno.criterios.map((valor, ci) =>
+                            ci === cIndex
+                                ? Math.min(5, Math.max(0, valor + delta))
+                                : valor
+                        ),
+                    }
+                    : alumno
+            ),
+        }));
+    };
+
+    const sumaCriterios = (criterios) => criterios.reduce((a, b) => a + b, 0);
 
     const calcularPuestos = (alumnos) => {
         const conTotales = alumnos.map((a, idx) => ({
             ...a,
             total: sumaCriterios(a.criterios),
-            originalIndex: idx
+            originalIndex: idx,
         }));
-
         const ordenados = [...conTotales].sort((a, b) => b.total - a.total);
-
         let puestoActual = 0;
         let ultimoTotal = null;
 
@@ -96,117 +89,109 @@ export const PageJurado = () => {
             }
             conTotales[a.originalIndex].puesto = puestoActual;
         });
-
         return conTotales;
     };
 
-    const toggleGroup = (gIndex) =>
-        setExpandedGroups((prev) => ({ ...prev, [gIndex]: !prev[gIndex] }));
+    const handleSaveScore = (alumno) => {
+        setSaving((prev) => ({ ...prev, [alumno.idStudentEventRound]: true }));
 
-    const toggleRound = (gIndex, rIndex) => {
-        const key = `${gIndex}-${rIndex}`;
-        setExpandedRounds((prev) => ({ ...prev, [key]: !prev[key] }));
+        const payload = {
+            idStudentEventRound: alumno.idStudentEventRound,
+            scores: alumno.criterios,
+            total: alumno.total,
+            puesto: alumno.puesto,
+        };
+
+        saveScore(payload)
+            .then(() => console.log("Puntaje guardado correctamente", payload))
+            .catch((err) => console.error("Error al guardar puntaje:", err))
+            .finally(() =>
+                setSaving((prev) => ({ ...prev, [alumno.idStudentEventRound]: false }))
+            );
     };
 
     return (
         <div className="p-4">
-            {grupos.map((grupo, gIndex) => (
-                <div key={gIndex} className="mb-4 border rounded">
+            {grupos.map((grupo) => (
+                <div key={grupo.idGrade} className="mb-4 border rounded">
                     <div
                         className="flex items-center cursor-pointer bg-blue-100 p-2"
-                        onClick={() => toggleGroup(gIndex)}
+                        onClick={() => toggleGroup(grupo.idGrade)}
                     >
-                        {expandedGroups[gIndex] ? <FaChevronDown /> : <FaChevronRight />}
-                        <h2 className="ml-2 font-bold">{grupo.nombre}</h2>
+                        {expandedGroups[grupo.idGrade] ? <FaChevronDown /> : <FaChevronRight />}
+                        <h2 className="ml-2 font-bold">{grupo.gradeName + " " + grupo.levelName}</h2>
                     </div>
-                    {expandedGroups[gIndex] &&
-                        grupo.rondas.map((ronda, rIndex) => {
-                            const alumnosConPuesto = calcularPuestos(ronda.alumnos);
-                            const key = `${gIndex}-${rIndex}`;
-                            return (
-                                <div key={rIndex} className="ml-4 border rounded mt-2">
-                                    <div
-                                        className="flex items-center cursor-pointer bg-green-100 p-2"
-                                        onClick={() => toggleRound(gIndex, rIndex)}
-                                    >
-                                        {expandedRounds[key] ? <FaChevronDown /> : <FaChevronRight />}
-                                        <h3 className="ml-2 font-semibold">{ronda.nombre}</h3>
-                                    </div>
-                                    {expandedRounds[key] && (
-                                        <div className="overflow-x-auto">
-                                            <table className="min-w-full border mt-2">
-                                                <thead className="bg-gray-200">
-                                                    <tr>
-                                                        <th className="border p-2">Alumno</th>
-                                                        <th className="border p-2">Palabra</th>
-                                                        {nameCriterios.map((c, idx) => (
-                                                            <th key={idx} className="border p-2">
-                                                                {c}
-                                                            </th>
-                                                        ))}
-                                                        <th className="border p-2">Puntaje Total</th>
-                                                        <th className="border p-2">Puesto</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {alumnosConPuesto.map((al) => (
-                                                        <tr key={al.originalIndex} className="text-center">
-                                                            <td className="border p-2 font-bold">{al.alumno}</td>
-                                                            <td className="border p-2 italic">{al.palabra}</td>
-                                                            {al.criterios.map((c, cIndex) => (
-                                                                <td key={cIndex} className="border p-2">
-                                                                    <div className="flex items-center justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                cambiarCriterio(
-                                                                                    gIndex,
-                                                                                    rIndex,
-                                                                                    al.originalIndex,
-                                                                                    cIndex,
-                                                                                    -1
-                                                                                )
-                                                                            }
-                                                                            disabled={c === 0}
-                                                                            className="p-1 bg-red-200 rounded disabled:opacity-50"
-                                                                        >
-                                                                            <FaMinus />
-                                                                        </button>
-                                                                        <span>{c}</span>
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                cambiarCriterio(
-                                                                                    gIndex,
-                                                                                    rIndex,
-                                                                                    al.originalIndex,
-                                                                                    cIndex,
-                                                                                    1
-                                                                                )
-                                                                            }
-                                                                            disabled={c === 5}
-                                                                            className="p-1 bg-green-200 rounded disabled:opacity-50"
-                                                                        >
-                                                                            <FaPlus />
-                                                                        </button>
-                                                                    </div>
-                                                                    <div className="w-full h-2 bg-gray-200 rounded mt-1">
-                                                                        <div
-                                                                            className="h-full bg-blue-400 rounded"
-                                                                            style={{ width: `${(c / 5) * 100}%` }}
-                                                                        ></div>
-                                                                    </div>
-                                                                </td>
-                                                            ))}
-                                                            <td className="border p-2 font-bold">{al.total}</td>
-                                                            <td className="border p-2">#{al.puesto}</td>
-                                                        </tr>
+
+                    {expandedGroups[grupo.idGrade] && (
+                        <div className="p-2">
+                            {loadingRounds[grupo.idGrade] && <p>Cargando rondas...</p>}
+
+                            {!loadingRounds[grupo.idGrade] && roundsData[grupo.idGrade] && (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full border mt-2">
+                                        <thead className="bg-gray-200">
+                                            <tr>
+                                                <th className="border p-2">Alumno</th>
+                                                <th className="border p-2">Palabra</th>
+                                                {nameCriterios.map((c, idx) => (
+                                                    <th key={idx} className="border p-2">{c}</th>
+                                                ))}
+                                                <th className="border p-2">Puntaje Total</th>
+                                                <th className="border p-2">Puesto</th>
+                                                <th className="border p-2">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {calcularPuestos(roundsData[grupo.idGrade]).map((al, aIndex) => (
+                                                <tr key={aIndex} className="text-center">
+                                                    <td className="border p-2 font-bold">{al.alumno}</td>
+                                                    <td className="border p-2 italic">{al.palabra}</td>
+                                                    {al.criterios.map((c, cIndex) => (
+                                                        <td key={cIndex} className="border p-2">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <button
+                                                                    onClick={() => cambiarCriterio(grupo.idGrade, aIndex, cIndex, -1)}
+                                                                    disabled={c === 0}
+                                                                    className="p-1 bg-red-200 rounded disabled:opacity-50"
+                                                                >
+                                                                    <FaMinus />
+                                                                </button>
+                                                                <span>{c}</span>
+                                                                <button
+                                                                    onClick={() => cambiarCriterio(grupo.idGrade, aIndex, cIndex, 1)}
+                                                                    disabled={c === 5}
+                                                                    className="p-1 bg-green-200 rounded disabled:opacity-50"
+                                                                >
+                                                                    <FaPlus />
+                                                                </button>
+                                                            </div>
+                                                            <div className="w-full h-2 bg-gray-200 rounded mt-1">
+                                                                <div
+                                                                    className="h-full bg-blue-400 rounded"
+                                                                    style={{ width: `${(c / 5) * 100}%` }}
+                                                                ></div>
+                                                            </div>
+                                                        </td>
                                                     ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                                    <td className="border p-2 font-bold">{al.total}</td>
+                                                    <td className="border p-2">#{al.puesto}</td>
+                                                    <td className="border p-2">
+                                                        <button
+                                                            onClick={() => handleSaveScore(al)}
+                                                            disabled={saving[al.idStudentEventRound]}
+                                                            className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
+                                                        >
+                                                            <FaCheck />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
