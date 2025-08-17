@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getGroups, getRoundsByGroupId, saveScore } from "../../../api/RoundAPI";
+import { getGroups, getRoundsByGroupId, getStudentsByRoundId, saveScore } from "../../../api/RoundAPI";
 import { FaChevronDown, FaChevronRight, FaPlus, FaMinus, FaCheck } from "react-icons/fa";
 
 const nameCriterios = [
@@ -14,7 +14,9 @@ export const PageJurado = () => {
     const [grupos, setGrupos] = useState([]);
     const [expandedGroups, setExpandedGroups] = useState({});
     const [roundsData, setRoundsData] = useState({});
+    const [studentsData, setStudentsData] = useState({});
     const [loadingRounds, setLoadingRounds] = useState({});
+    const [loadingStudents, setLoadingStudents] = useState({});
     const [saving, setSaving] = useState({});
 
     useEffect(() => {
@@ -28,27 +30,9 @@ export const PageJurado = () => {
 
         if (!roundsData[idGrade]) {
             setLoadingRounds((prev) => ({ ...prev, [idGrade]: true }));
-
             getRoundsByGroupId(idGrade)
                 .then((res) => {
-                    // Agrupar por numberRound
-                    const agrupado = res.data.reduce((acc, item) => {
-                        if (!acc[item.numberRound]) acc[item.numberRound] = [];
-                        acc[item.numberRound].push({
-                            idStudentEventRound: item.idStudentEventRound,
-                            alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
-                            palabra: item.word.trim(),
-                            criterios: [
-                                item.criterionOne,
-                                item.criterionTwo,
-                                item.criterionThree,
-                                item.criterionFour,
-                                item.criterionFive,
-                            ],
-                        });
-                        return acc;
-                    }, {});
-                    setRoundsData((prev) => ({ ...prev, [idGrade]: agrupado }));
+                    setRoundsData((prev) => ({ ...prev, [idGrade]: res.data }));
                 })
                 .catch((err) => console.error("Error al obtener rondas:", err))
                 .finally(() =>
@@ -57,31 +41,52 @@ export const PageJurado = () => {
         }
     };
 
-    const toggleRound = (idGrade, numberRound) => {
+    const toggleRound = (idRound) => {
         setExpandedGroups((prev) => ({
             ...prev,
-            [`${idGrade}-${numberRound}`]: !prev[`${idGrade}-${numberRound}`]
+            [idRound]: !prev[idRound],
         }));
+
+        if (!studentsData[idRound]) {
+            setLoadingStudents((prev) => ({ ...prev, [idRound]: true }));
+            getStudentsByRoundId(idRound)
+                .then((res) => {
+                    const alumnos = res.data.map((item) => ({
+                        idStudentEventRound: item.idStudentEventRound,
+                        alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
+                        palabra: item.word.trim(),
+                        criterios: [
+                            item.criterionOne,
+                            item.criterionTwo,
+                            item.criterionThree,
+                            item.criterionFour,
+                            item.criterionFive,
+                        ],
+                    }));
+                    setStudentsData((prev) => ({ ...prev, [idRound]: alumnos }));
+                })
+                .catch((err) => console.error("Error al obtener alumnos:", err))
+                .finally(() =>
+                    setLoadingStudents((prev) => ({ ...prev, [idRound]: false }))
+                );
+        }
     };
 
-    const cambiarCriterio = (idGrade, numberRound, aIndex, cIndex, delta) => {
-        setRoundsData((prev) => ({
+    const cambiarCriterio = (idRound, aIndex, cIndex, delta) => {
+        setStudentsData((prev) => ({
             ...prev,
-            [idGrade]: {
-                ...prev[idGrade],
-                [numberRound]: prev[idGrade][numberRound].map((alumno, ai) =>
-                    ai === aIndex
-                        ? {
-                            ...alumno,
-                            criterios: alumno.criterios.map((valor, ci) =>
-                                ci === cIndex
-                                    ? Math.min(5, Math.max(0, valor + delta))
-                                    : valor
-                            ),
-                        }
-                        : alumno
-                ),
-            },
+            [idRound]: prev[idRound].map((alumno, ai) =>
+                ai === aIndex
+                    ? {
+                        ...alumno,
+                        criterios: alumno.criterios.map((valor, ci) =>
+                            ci === cIndex
+                                ? Math.min(5, Math.max(0, valor + delta))
+                                : valor
+                        ),
+                    }
+                    : alumno
+            ),
         }));
     };
 
@@ -142,80 +147,84 @@ export const PageJurado = () => {
                             {loadingRounds[grupo.idGrade] && <p>Cargando rondas...</p>}
 
                             {!loadingRounds[grupo.idGrade] && roundsData[grupo.idGrade] && (
-                                Object.entries(roundsData[grupo.idGrade]).map(([roundNumber, alumnos]) => (
-                                    <div key={roundNumber} className="mb-2 border rounded">
+                                roundsData[grupo.idGrade].map((round) => (
+                                    <div key={round.idRound} className="mb-2 border rounded">
                                         <div
                                             className="flex items-center cursor-pointer bg-green-100 p-2"
-                                            onClick={() => toggleRound(grupo.idGrade, roundNumber)}
+                                            onClick={() => toggleRound(round.idRound)}
                                         >
-                                            {expandedGroups[`${grupo.idGrade}-${roundNumber}`]
+                                            {expandedGroups[round.idRound]
                                                 ? <FaChevronDown />
                                                 : <FaChevronRight />}
-                                            <h3 className="ml-2 font-bold">Ronda {roundNumber}</h3>
+                                            <h3 className="ml-2 font-bold">Ronda {round.numberRound}</h3>
                                         </div>
 
-                                        {expandedGroups[`${grupo.idGrade}-${roundNumber}`] && (
+                                        {expandedGroups[round.idRound] && (
                                             <div className="p-2 overflow-x-auto">
-                                                <table className="min-w-full border mt-2">
-                                                    <thead className="bg-gray-200">
-                                                        <tr>
-                                                            <th className="border p-2">Alumno</th>
-                                                            <th className="border p-2">Palabra</th>
-                                                            {nameCriterios.map((c, idx) => (
-                                                                <th key={idx} className="border p-2">{c}</th>
-                                                            ))}
-                                                            <th className="border p-2">Puntaje Total</th>
-                                                            <th className="border p-2">Puesto</th>
-                                                            <th className="border p-2">Acciones</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {calcularPuestos(alumnos).map((al, aIndex) => (
-                                                            <tr key={aIndex} className="text-center">
-                                                                <td className="border p-2 font-bold">{al.alumno}</td>
-                                                                <td className="border p-2 italic">{al.palabra}</td>
-                                                                {al.criterios.map((c, cIndex) => (
-                                                                    <td key={cIndex} className="border p-2">
-                                                                        <div className="flex items-center justify-center gap-2">
-                                                                            <button
-                                                                                onClick={() => cambiarCriterio(grupo.idGrade, roundNumber, aIndex, cIndex, -1)}
-                                                                                disabled={c === 0}
-                                                                                className="p-1 bg-red-200 rounded disabled:opacity-50"
-                                                                            >
-                                                                                <FaMinus />
-                                                                            </button>
-                                                                            <span>{c}</span>
-                                                                            <button
-                                                                                onClick={() => cambiarCriterio(grupo.idGrade, roundNumber, aIndex, cIndex, 1)}
-                                                                                disabled={c === 5}
-                                                                                className="p-1 bg-green-200 rounded disabled:opacity-50"
-                                                                            >
-                                                                                <FaPlus />
-                                                                            </button>
-                                                                        </div>
-                                                                        <div className="w-full h-2 bg-gray-200 rounded mt-1">
-                                                                            <div
-                                                                                className="h-full bg-blue-400 rounded"
-                                                                                style={{ width: `${(c / 5) * 100}%` }}
-                                                                            ></div>
-                                                                        </div>
-                                                                    </td>
+                                                {loadingStudents[round.idRound] && <p>Cargando alumnos...</p>}
+
+                                                {!loadingStudents[round.idRound] && studentsData[round.idRound] && (
+                                                    <table className="min-w-full border mt-2">
+                                                        <thead className="bg-gray-200">
+                                                            <tr>
+                                                                <th className="border p-2">Alumno</th>
+                                                                <th className="border p-2">Palabra</th>
+                                                                {nameCriterios.map((c, idx) => (
+                                                                    <th key={idx} className="border p-2">{c}</th>
                                                                 ))}
-                                                                <td className="border p-2 font-bold">{al.total}</td>
-                                                                <td className="border p-2">#{al.puesto}</td>
-                                                                <td className="border p-2">
-                                                                    <button
-                                                                        onClick={() => handleSaveScore(al)}
-                                                                        disabled={saving[al.idStudentEventRound]}
-                                                                        className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
-                                                                    >
-                                                                        <FaCheck />
-                                                                    </button>
-                                                                </td>
+                                                                <th className="border p-2">Puntaje Total</th>
+                                                                <th className="border p-2">Puesto</th>
+                                                                <th className="border p-2">Acciones</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                        </thead>
+                                                        <tbody>
+                                                            {calcularPuestos(studentsData[round.idRound]).map((al, aIndex) => (
+                                                                <tr key={aIndex} className="text-center">
+                                                                    <td className="border p-2 font-bold">{al.alumno}</td>
+                                                                    <td className="border p-2 italic">{al.palabra}</td>
+                                                                    {al.criterios.map((c, cIndex) => (
+                                                                        <td key={cIndex} className="border p-2">
+                                                                            <div className="flex items-center justify-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => cambiarCriterio(round.idRound, aIndex, cIndex, -1)}
+                                                                                    disabled={c === 0}
+                                                                                    className="p-1 bg-red-200 rounded disabled:opacity-50"
+                                                                                >
+                                                                                    <FaMinus />
+                                                                                </button>
+                                                                                <span>{c}</span>
+                                                                                <button
+                                                                                    onClick={() => cambiarCriterio(round.idRound, aIndex, cIndex, 1)}
+                                                                                    disabled={c === 5}
+                                                                                    className="p-1 bg-green-200 rounded disabled:opacity-50"
+                                                                                >
+                                                                                    <FaPlus />
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="w-full h-2 bg-gray-200 rounded mt-1">
+                                                                                <div
+                                                                                    className="h-full bg-blue-400 rounded"
+                                                                                    style={{ width: `${(c / 5) * 100}%` }}
+                                                                                ></div>
+                                                                            </div>
+                                                                        </td>
+                                                                    ))}
+                                                                    <td className="border p-2 font-bold">{al.total}</td>
+                                                                    <td className="border p-2">#{al.puesto}</td>
+                                                                    <td className="border p-2">
+                                                                        <button
+                                                                            onClick={() => handleSaveScore(al)}
+                                                                            disabled={saving[al.idStudentEventRound]}
+                                                                            className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
+                                                                        >
+                                                                            <FaCheck />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
                                             </div>
                                         )}
                                     </div>
