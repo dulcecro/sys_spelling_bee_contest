@@ -207,7 +207,7 @@ export const PageJurado = () => {
                                                     <FaChevronRight />
                                                 )}
                                                 <h3 className="ml-2 font-bold">
-                                                    Ronda {round.numberRound}
+                                                    Round {round.numberRound}
                                                 </h3>
                                             </div>
 
@@ -220,18 +220,18 @@ export const PageJurado = () => {
                                                     {!loadingStudents[round.idRound] &&
                                                         studentsData[round.idRound] && (
                                                             <table className="min-w-full border mt-2">
-                                                                <thead className="bg-gray-200">
+                                                                <thead className="bg-yellow-300">
                                                                     <tr>
-                                                                        <th className="border p-2">Alumno</th>
-                                                                        <th className="border p-2">Palabra</th>
+                                                                        <th className="border p-2">Student</th>
+                                                                        <th className="border p-2">Word</th>
                                                                         {nameCriterios.map((c, idx) => (
                                                                             <th key={idx} className="border p-2">
                                                                                 {c}
                                                                             </th>
                                                                         ))}
-                                                                        <th className="border p-2">Puntaje Total</th>
-                                                                        <th className="border p-2">Puesto</th>
-                                                                        <th className="border p-2">Acciones</th>
+                                                                        <th className="border p-2">Total Score</th>
+                                                                        <th className="border p-2">Position</th>
+                                                                        <th className="border p-2">Actions</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
