@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Header from "../../../components/Header";
 import {
     getGroups,
     getRoundsByGroupId,
@@ -168,166 +169,170 @@ export const PageJurado = () => {
     };
 
     return (
-        <div className="p-4">
-            {grupos.map((grupo) => (
-                <div key={grupo.idGrade} className="mb-4 border rounded">
-                    <div
-                        className="flex items-center cursor-pointer bg-blue-100 p-2"
-                        onClick={() => toggleGroup(grupo.idGrade)}
-                    >
-                        {expandedGroups[grupo.idGrade] ? (
-                            <FaChevronDown />
-                        ) : (
-                            <FaChevronRight />
-                        )}
-                        <h2 className="ml-2 font-bold">
-                            {grupo.gradeName + " " + grupo.levelName}
-                        </h2>
-                    </div>
-
-                    {expandedGroups[grupo.idGrade] && (
-                        <div className="p-2">
-                            {loadingRounds[grupo.idGrade] && <p>Cargando rondas...</p>}
-
-                            {!loadingRounds[grupo.idGrade] &&
-                                roundsData[grupo.idGrade] &&
-                                roundsData[grupo.idGrade].map((round) => (
-                                    <div key={round.idRound} className="mb-2 border rounded">
-                                        <div
-                                            className="flex items-center cursor-pointer bg-green-100 p-2"
-                                            onClick={() => toggleRound(round.idRound)}
-                                        >
-                                            {expandedGroups[round.idRound] ? (
-                                                <FaChevronDown />
-                                            ) : (
-                                                <FaChevronRight />
-                                            )}
-                                            <h3 className="ml-2 font-bold">
-                                                Ronda {round.numberRound}
-                                            </h3>
-                                        </div>
-
-                                        {expandedGroups[round.idRound] && (
-                                            <div className="p-2 overflow-x-auto">
-                                                {loadingStudents[round.idRound] && (
-                                                    <p>Cargando alumnos...</p>
-                                                )}
-
-                                                {!loadingStudents[round.idRound] &&
-                                                    studentsData[round.idRound] && (
-                                                        <table className="min-w-full border mt-2">
-                                                            <thead className="bg-gray-200">
-                                                                <tr>
-                                                                    <th className="border p-2">Alumno</th>
-                                                                    <th className="border p-2">Palabra</th>
-                                                                    {nameCriterios.map((c, idx) => (
-                                                                        <th key={idx} className="border p-2">
-                                                                            {c}
-                                                                        </th>
-                                                                    ))}
-                                                                    <th className="border p-2">Puntaje Total</th>
-                                                                    <th className="border p-2">Puesto</th>
-                                                                    <th className="border p-2">Acciones</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {calcularPuestos(
-                                                                    studentsData[round.idRound]
-                                                                ).map((al, aIndex) => (
-                                                                    <tr
-                                                                        key={aIndex}
-                                                                        className={`text-center ${al.close ? "opacity-60" : ""
-                                                                            }`}
-                                                                    >
-                                                                        <td className="border p-2 font-bold">
-                                                                            {al.alumno}
-                                                                        </td>
-                                                                        <td className="border p-2 italic">
-                                                                            {al.palabra}
-                                                                        </td>
-
-                                                                        {al.criterios.map((c, cIndex) => (
-                                                                            <td key={cIndex} className="border p-2">
-                                                                                <div className="flex items-center justify-center gap-2">
-                                                                                    <button
-                                                                                        onClick={() =>
-                                                                                            cambiarCriterio(
-                                                                                                round.idRound,
-                                                                                                aIndex,
-                                                                                                cIndex,
-                                                                                                -1
-                                                                                            )
-                                                                                        }
-                                                                                        disabled={c === 0 || al.close}
-                                                                                        className="p-1 bg-red-200 rounded disabled:opacity-50"
-                                                                                    >
-                                                                                        <FaMinus />
-                                                                                    </button>
-                                                                                    <span>{c}</span>
-                                                                                    <button
-                                                                                        onClick={() =>
-                                                                                            cambiarCriterio(
-                                                                                                round.idRound,
-                                                                                                aIndex,
-                                                                                                cIndex,
-                                                                                                1
-                                                                                            )
-                                                                                        }
-                                                                                        disabled={c === 5 || al.close}
-                                                                                        className="p-1 bg-green-200 rounded disabled:opacity-50"
-                                                                                    >
-                                                                                        <FaPlus />
-                                                                                    </button>
-                                                                                </div>
-                                                                                <div className="w-full h-2 bg-gray-200 rounded mt-1">
-                                                                                    <div
-                                                                                        className="h-full bg-blue-400 rounded"
-                                                                                        style={{
-                                                                                            width: `${(c / 5) * 100}%`,
-                                                                                        }}
-                                                                                    ></div>
-                                                                                </div>
-                                                                            </td>
-                                                                        ))}
-
-                                                                        <td className="border p-2 font-bold">
-                                                                            {al.total}
-                                                                        </td>
-                                                                        <td className="border p-2">
-                                                                            #{al.puesto}
-                                                                        </td>
-                                                                        <td className="border p-2">
-                                                                            <button
-                                                                                onClick={() =>
-                                                                                    handleSaveScore(al, round.idRound)
-                                                                                }
-                                                                                disabled={
-                                                                                    saving[al.idStudentEventRound] ||
-                                                                                    al.close
-                                                                                }
-                                                                                className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
-                                                                                title={
-                                                                                    al.close
-                                                                                        ? "Ronda del alumno cerrada"
-                                                                                        : "Guardar y cerrar"
-                                                                                }
-                                                                            >
-                                                                                <FaCheck />
-                                                                            </button>
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+        <div>
+            <Header />
+        
+            <div className="p-4 mt-10">
+                {grupos.map((grupo) => (
+                    <div key={grupo.idGrade} className="mb-4 border rounded">
+                        <div
+                            className="flex items-center cursor-pointer bg-blue-100 p-2"
+                            onClick={() => toggleGroup(grupo.idGrade)}
+                        >
+                            {expandedGroups[grupo.idGrade] ? (
+                                <FaChevronDown />
+                            ) : (
+                                <FaChevronRight />
+                            )}
+                            <h2 className="ml-2 font-bold">
+                                {grupo.gradeName + " " + grupo.levelName}
+                            </h2>
                         </div>
-                    )}
-                </div>
-            ))}
+
+                        {expandedGroups[grupo.idGrade] && (
+                            <div className="p-2">
+                                {loadingRounds[grupo.idGrade] && <p>Cargando rondas...</p>}
+
+                                {!loadingRounds[grupo.idGrade] &&
+                                    roundsData[grupo.idGrade] &&
+                                    roundsData[grupo.idGrade].map((round) => (
+                                        <div key={round.idRound} className="mb-2 border rounded">
+                                            <div
+                                                className="flex items-center cursor-pointer bg-green-100 p-2"
+                                                onClick={() => toggleRound(round.idRound)}
+                                            >
+                                                {expandedGroups[round.idRound] ? (
+                                                    <FaChevronDown />
+                                                ) : (
+                                                    <FaChevronRight />
+                                                )}
+                                                <h3 className="ml-2 font-bold">
+                                                    Ronda {round.numberRound}
+                                                </h3>
+                                            </div>
+
+                                            {expandedGroups[round.idRound] && (
+                                                <div className="p-2 overflow-x-auto">
+                                                    {loadingStudents[round.idRound] && (
+                                                        <p>Cargando alumnos...</p>
+                                                    )}
+
+                                                    {!loadingStudents[round.idRound] &&
+                                                        studentsData[round.idRound] && (
+                                                            <table className="min-w-full border mt-2">
+                                                                <thead className="bg-gray-200">
+                                                                    <tr>
+                                                                        <th className="border p-2">Alumno</th>
+                                                                        <th className="border p-2">Palabra</th>
+                                                                        {nameCriterios.map((c, idx) => (
+                                                                            <th key={idx} className="border p-2">
+                                                                                {c}
+                                                                            </th>
+                                                                        ))}
+                                                                        <th className="border p-2">Puntaje Total</th>
+                                                                        <th className="border p-2">Puesto</th>
+                                                                        <th className="border p-2">Acciones</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {calcularPuestos(
+                                                                        studentsData[round.idRound]
+                                                                    ).map((al, aIndex) => (
+                                                                        <tr
+                                                                            key={aIndex}
+                                                                            className={`text-center ${al.close ? "opacity-60" : ""
+                                                                                }`}
+                                                                        >
+                                                                            <td className="border p-2 font-bold">
+                                                                                {al.alumno}
+                                                                            </td>
+                                                                            <td className="border p-2 italic">
+                                                                                {al.palabra}
+                                                                            </td>
+
+                                                                            {al.criterios.map((c, cIndex) => (
+                                                                                <td key={cIndex} className="border p-2">
+                                                                                    <div className="flex items-center justify-center gap-2">
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                cambiarCriterio(
+                                                                                                    round.idRound,
+                                                                                                    aIndex,
+                                                                                                    cIndex,
+                                                                                                    -1
+                                                                                                )
+                                                                                            }
+                                                                                            disabled={c === 0 || al.close}
+                                                                                            className="p-1 bg-red-200 rounded disabled:opacity-50"
+                                                                                        >
+                                                                                            <FaMinus />
+                                                                                        </button>
+                                                                                        <span>{c}</span>
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                cambiarCriterio(
+                                                                                                    round.idRound,
+                                                                                                    aIndex,
+                                                                                                    cIndex,
+                                                                                                    1
+                                                                                                )
+                                                                                            }
+                                                                                            disabled={c === 5 || al.close}
+                                                                                            className="p-1 bg-green-200 rounded disabled:opacity-50"
+                                                                                        >
+                                                                                            <FaPlus />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                    <div className="w-full h-2 bg-gray-200 rounded mt-1">
+                                                                                        <div
+                                                                                            className="h-full bg-blue-400 rounded"
+                                                                                            style={{
+                                                                                                width: `${(c / 5) * 100}%`,
+                                                                                            }}
+                                                                                        ></div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            ))}
+
+                                                                            <td className="border p-2 font-bold">
+                                                                                {al.total}
+                                                                            </td>
+                                                                            <td className="border p-2">
+                                                                                #{al.puesto}
+                                                                            </td>
+                                                                            <td className="border p-2">
+                                                                                <button
+                                                                                    onClick={() =>
+                                                                                        handleSaveScore(al, round.idRound)
+                                                                                    }
+                                                                                    disabled={
+                                                                                        saving[al.idStudentEventRound] ||
+                                                                                        al.close
+                                                                                    }
+                                                                                    className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
+                                                                                    title={
+                                                                                        al.close
+                                                                                            ? "Ronda del alumno cerrada"
+                                                                                            : "Guardar y cerrar"
+                                                                                    }
+                                                                                >
+                                                                                    <FaCheck />
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
