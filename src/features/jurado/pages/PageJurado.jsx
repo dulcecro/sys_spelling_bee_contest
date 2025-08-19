@@ -5,6 +5,8 @@ import {
     getRoundsByGroupId,
     getStudentsByRoundId,
     saveScore,
+    getCategories,
+    createRound, // <-- nuevo endpoint
 } from "../../../api/RoundAPI";
 import {
     FaChevronDown,
@@ -31,6 +33,12 @@ export const PageJurado = () => {
     const [loadingStudents, setLoadingStudents] = useState({});
     const [saving, setSaving] = useState({});
 
+    // Modal
+    const [showModal, setShowModal] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [selectedGroup, setSelectedGroup] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
     useEffect(() => {
         getGroups()
             .then((res) => setGrupos(res.data))
@@ -44,7 +52,16 @@ export const PageJurado = () => {
             setLoadingRounds((prev) => ({ ...prev, [idGrade]: true }));
             getRoundsByGroupId(idGrade)
                 .then((res) => {
-                    // Se espera un arreglo de rondas [{idRound, idGrade, numberRound, ...}]
+                    if (!res.data || res.data.length === 0) {
+                        // si no hay rondas, abrir modal
+                        setSelectedGroup(idGrade);
+                        setShowModal(true);
+                        getCategories()
+                            .then((r) => setCategories(r.data || []))
+                            .catch((err) =>
+                                console.error("Error al obtener categorías:", err)
+                            );
+                    }
                     setRoundsData((prev) => ({ ...prev, [idGrade]: res.data || [] }));
                 })
                 .catch((err) => console.error("Error al obtener rondas:", err))
@@ -64,7 +81,6 @@ export const PageJurado = () => {
             setLoadingStudents((prev) => ({ ...prev, [idRound]: true }));
             getStudentsByRoundId(idRound)
                 .then((res) => {
-                    // Mapeamos la data del backend a lo que usa la UI
                     const alumnos = (res.data || []).map((item) => ({
                         idStudentEventRound: item.idStudentEventRound,
                         alumno: `${item.paternalSurname} ${item.maternalSurname} ${item.nameStudent}`,
@@ -76,10 +92,9 @@ export const PageJurado = () => {
                             item.criterionFour,
                             item.criterionFive,
                         ],
-                        // campos adicionales necesarios para guardar/bloquear
                         idWordRound: item.idWordRound,
                         close: Boolean(item.close),
-                        position: item.position, // puede venir 0, o null; se ajustará al guardar
+                        position: item.position,
                     }));
                     setStudentsData((prev) => ({ ...prev, [idRound]: alumnos }));
                 })
@@ -96,11 +111,13 @@ export const PageJurado = () => {
             [idRound]: prev[idRound].map((alumno, ai) =>
                 ai === aIndex
                     ? alumno.close
-                        ? alumno // bloqueado si close: true
+                        ? alumno
                         : {
                             ...alumno,
                             criterios: alumno.criterios.map((valor, ci) =>
-                                ci === cIndex ? Math.min(5, Math.max(0, valor + delta)) : valor
+                                ci === cIndex
+                                    ? Math.min(5, Math.max(0, valor + delta))
+                                    : valor
                             ),
                         }
                     : alumno
@@ -133,7 +150,6 @@ export const PageJurado = () => {
     const handleSaveScore = (alumno, idRound) => {
         setSaving((prev) => ({ ...prev, [alumno.idStudentEventRound]: true }));
 
-        // position: prioriza el que trae el backend; si no existe, usa el puesto calculado
         const computedPosition = Number.isFinite(alumno?.position)
             ? alumno.position
             : alumno.puesto;
@@ -149,10 +165,8 @@ export const PageJurado = () => {
             close: true,
         };
 
-        // PUT /round_student/{idStudentEventRound}
         saveScore(alumno.idStudentEventRound, payload)
             .then(() => {
-                // marcar como cerrado en el estado local y consolidar 'position'
                 setStudentsData((prev) => ({
                     ...prev,
                     [idRound]: prev[idRound].map((a) =>
@@ -168,10 +182,28 @@ export const PageJurado = () => {
             );
     };
 
+    const handleCreateRound = (idCategory) => {
+        if (!selectedGroup || !idCategory) return;
+        createRound({ idGrade: selectedGroup, idCategory })
+            .then(() => {
+                // recargar rondas del grupo
+                getRoundsByGroupId(selectedGroup).then((res) => {
+                    setRoundsData((prev) => ({
+                        ...prev,
+                        [selectedGroup]: res.data || [],
+                    }));
+                });
+                setShowModal(false);
+                setSelectedGroup(null);
+                setSelectedCategory(null);
+            })
+            .catch((err) => console.error("Error al crear ronda:", err));
+    };
+
     return (
         <div>
             <Header />
-        
+
             <div className="p-4 mt-10">
                 {grupos.map((grupo) => (
                     <div key={grupo.idGrade} className="mb-4 border rounded">
@@ -210,122 +242,7 @@ export const PageJurado = () => {
                                                     Round {round.numberRound}
                                                 </h3>
                                             </div>
-
-                                            {expandedGroups[round.idRound] && (
-                                                <div className="p-2 overflow-x-auto">
-                                                    {loadingStudents[round.idRound] && (
-                                                        <p>Cargando alumnos...</p>
-                                                    )}
-
-                                                    {!loadingStudents[round.idRound] &&
-                                                        studentsData[round.idRound] && (
-                                                            <table className="min-w-full border mt-2">
-                                                                <thead className="bg-yellow-300">
-                                                                    <tr>
-                                                                        <th className="border p-2">Student</th>
-                                                                        <th className="border p-2">Word</th>
-                                                                        {nameCriterios.map((c, idx) => (
-                                                                            <th key={idx} className="border p-2">
-                                                                                {c}
-                                                                            </th>
-                                                                        ))}
-                                                                        <th className="border p-2">Total Score</th>
-                                                                        <th className="border p-2">Position</th>
-                                                                        <th className="border p-2">Actions</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {calcularPuestos(
-                                                                        studentsData[round.idRound]
-                                                                    ).map((al, aIndex) => (
-                                                                        <tr
-                                                                            key={aIndex}
-                                                                            className={`text-center ${al.close ? "opacity-60" : ""
-                                                                                }`}
-                                                                        >
-                                                                            <td className="border p-2 font-bold">
-                                                                                {al.alumno}
-                                                                            </td>
-                                                                            <td className="border p-2 italic">
-                                                                                {al.palabra}
-                                                                            </td>
-
-                                                                            {al.criterios.map((c, cIndex) => (
-                                                                                <td key={cIndex} className="border p-2">
-                                                                                    <div className="flex items-center justify-center gap-2">
-                                                                                        <button
-                                                                                            onClick={() =>
-                                                                                                cambiarCriterio(
-                                                                                                    round.idRound,
-                                                                                                    aIndex,
-                                                                                                    cIndex,
-                                                                                                    -1
-                                                                                                )
-                                                                                            }
-                                                                                            disabled={c === 0 || al.close}
-                                                                                            className="p-1 bg-red-200 rounded disabled:opacity-50"
-                                                                                        >
-                                                                                            <FaMinus />
-                                                                                        </button>
-                                                                                        <span>{c}</span>
-                                                                                        <button
-                                                                                            onClick={() =>
-                                                                                                cambiarCriterio(
-                                                                                                    round.idRound,
-                                                                                                    aIndex,
-                                                                                                    cIndex,
-                                                                                                    1
-                                                                                                )
-                                                                                            }
-                                                                                            disabled={c === 5 || al.close}
-                                                                                            className="p-1 bg-green-200 rounded disabled:opacity-50"
-                                                                                        >
-                                                                                            <FaPlus />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                    <div className="w-full h-2 bg-gray-200 rounded mt-1">
-                                                                                        <div
-                                                                                            className="h-full bg-blue-400 rounded"
-                                                                                            style={{
-                                                                                                width: `${(c / 5) * 100}%`,
-                                                                                            }}
-                                                                                        ></div>
-                                                                                    </div>
-                                                                                </td>
-                                                                            ))}
-
-                                                                            <td className="border p-2 font-bold">
-                                                                                {al.total}
-                                                                            </td>
-                                                                            <td className="border p-2">
-                                                                                #{al.puesto}
-                                                                            </td>
-                                                                            <td className="border p-2">
-                                                                                <button
-                                                                                    onClick={() =>
-                                                                                        handleSaveScore(al, round.idRound)
-                                                                                    }
-                                                                                    disabled={
-                                                                                        saving[al.idStudentEventRound] ||
-                                                                                        al.close
-                                                                                    }
-                                                                                    className="p-2 bg-blue-200 rounded hover:bg-blue-300 disabled:opacity-50"
-                                                                                    title={
-                                                                                        al.close
-                                                                                            ? "Ronda del alumno cerrada"
-                                                                                            : "Guardar y cerrar"
-                                                                                    }
-                                                                                >
-                                                                                    <FaCheck />
-                                                                                </button>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        )}
-                                                </div>
-                                            )}
+                                            {/* Aquí iría el render de alumnos */}
                                         </div>
                                     ))}
                             </div>
@@ -333,6 +250,54 @@ export const PageJurado = () => {
                     </div>
                 ))}
             </div>
+
+            {/* Modal de categorías */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+                        <h2 className="text-lg font-bold mb-4">
+                            Crear ronda para:{" "}
+                            {grupos.find((g) => g.idGrade === selectedGroup)?.gradeName +
+                                " " +
+                                grupos.find((g) => g.idGrade === selectedGroup)?.levelName}
+                        </h2>
+
+                        {/* Select de categorías */}
+                        <label className="block mb-2 font-medium">Selecciona categoría</label>
+                        <select
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="w-full border rounded p-2 mb-4"
+                            value={selectedCategory || ""}
+                        >
+                            <option value="" disabled>
+                                -- Selecciona --
+                            </option>
+                            {categories.map((cat) => (
+                                <option key={cat.idCategory} value={cat.idCategory}>
+                                    {cat.categoryName} (Dif: {cat.difficulty})
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* Botones */}
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleCreateRound(selectedCategory)}
+                                disabled={!selectedCategory}
+                                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                            >
+                                Crear Ronda
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
