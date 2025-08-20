@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Header from "../../../components/Header";
 import {
-    getGroups,
+    getGrades,
     getRoundsByGroupId,
     getStudentsByRoundId,
     saveScore,
@@ -40,7 +40,7 @@ export const PageJurado = () => {
     const [selectedCategory, setSelectedCategory] = useState(null);
 
     useEffect(() => {
-        getGroups()
+        getGrades()
             .then((res) => setGrupos(res.data))
             .catch((err) => console.error("Error al obtener grupos:", err));
     }, []);
@@ -95,6 +95,7 @@ export const PageJurado = () => {
                         idWordRound: item.idWordRound,
                         close: Boolean(item.close),
                         position: item.position,
+                        active: item.active || false
                     }));
                     setStudentsData((prev) => ({ ...prev, [idRound]: alumnos }));
                 })
@@ -182,8 +183,9 @@ export const PageJurado = () => {
             );
     };
 
-    const handleCreateRound = (idCategory) => {
-        if (!selectedGroup || !idCategory) return;
+    const handleCreateRound = (id_category) => {
+        if (!selectedGroup || !id_category) return;
+        const idCategory = Number(id_category, 10)
         createRound({ idGrade: selectedGroup, idCategory })
             .then(() => {
                 // recargar rondas del grupo
